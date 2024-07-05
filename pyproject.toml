@@ -1,0 +1,39 @@
+[project]
+name = "magistrska"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Gal Petkovšek", email = "gp1914@student.uni-lj.si"},
+]
+dependencies = [
+    "requests>=2.31.0",
+    "pandas>=2.2.0",
+    "transformers>=4.38.2",
+    "ipykernel>=6.29.3",
+    "torch>=2.2.1",
+    "matplotlib>=3.8.3",
+    "scikit-learn>=1.4.1.post1",
+    "nltk>=3.8.1",
+    "wordcloud>=1.9.3",
+    "mlflow>=2.11.1",
+    "setuptools>=69.2.0",
+    "plotly>=5.20.0",
+    "nbformat>=5.10.3",
+    "pytest>=8.1.1",
+    "scipy>=1.13.1",
+    "openai>=1.35.3",
+]
+requires-python = "==3.10.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+[tool.pdm.scripts]
+start_with.cmd = "python ./data-generator/app.py --config_file ./data-generator/config/mistral_config.json"
+start_without.cmd = "python ./data-generator/app.py --config_file ./data-generator/config/mistral_config_without.json"
+start.env_file = ".env"
+
+[tool.pdm]
+distribution = false
+
+[tool.ruff]
+ignore = ["E402"]

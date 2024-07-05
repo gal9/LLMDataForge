@@ -1,0 +1,68 @@
+{
+    "target_sample_number": 50000,
+    "sample_generator_configuration": {
+        "name": "classification",
+        "labels": ["anger", "joy", "fear"],
+        "target_distribution": "uniform",
+        "with_reference_prompt": "I need you to generate a single example of sentimental short texts. The text should not be around 100 characters long. The sentiment of the text that you will produce is {target_label}. You response should be a json format (do not provide any explanation just a single json) with only one field 'sample' containing the text. \n You are also provided with some examples. Following are the examples listed line by line with : separating the text from the emotion. The generated text should be similar to the examples but should not include the emotion at the end: \n {reference_texts}",
+        "without_reference_prompt": "I need you to generate a single example of sentimental short texts. The text should not be around 100 characters long. The sentiment of the text that you will produce is {target_label}. You response should be a json format (do not provide any explanation just a single json) with only one field 'sample' containing the text."
+    },
+    "reference_example_generator_configuration": {
+        "name": "random",
+        "batch_size": 15,
+        "data_file": "../data/emotion/original/one_time_split/examples.json"
+    },
+    "LLM_adapter_configuration": {
+        "name": "mistral",
+        "model_url": "https://medius-gpt-test-llm.apps.kubetest-ai.int.medius.si/generate",
+        "temperature": 1.0,
+        "top_k": 50,
+        "top_p": 0.98,
+        "repetition_penalty": 1.03
+    },
+    "data_filter_configuration": {
+        "sample_from_response_filter": "simple",
+        "save_interval": 100,
+        "optional_filters":[
+            {
+                "name": "isolate_samples"
+            },
+            {
+                "name": "multiple_lines_filter"
+            },
+            {
+                "name": "remove_spaces"
+            },
+            {
+                "name": "remove_hashtags"
+            },
+            {
+                "name": "remove_labels",
+                "labels": ["anger", "joy", "fear"]
+            },
+            {
+                "name": "remove_spaces"
+            },
+            {
+                "name": "remove_characters",
+                "character_list_end_of_string": [":"],
+                "filter_emojis": true
+            },
+            {
+                "name": "remove_spaces"
+            },
+            {
+                "name": "custom_emotion_task"
+            },
+            {
+                "name": "similar_samples"
+            }
+        ]
+    },
+    "dataset_handler_configuration": {
+        "name": "classification",
+        "dataframe_columns": ["Comment", "Emotion"],
+        "dataset_file_name_initialize": "../data/emotion/generated/Mistral/with/2/generated.csv",
+        "dataset_file": "../data/emotion/generated/Mistral/with/2/generated.csv"
+    }
+}
