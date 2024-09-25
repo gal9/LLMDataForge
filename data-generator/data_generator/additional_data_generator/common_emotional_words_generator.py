@@ -10,6 +10,7 @@ from .additional_data_generator import Additional_data_generator
 
 class Common_emotional_words_generator(Additional_data_generator):
     word_list: dict[str, tuple[list, list]]
+    all_words: list[str]
     file_paths: list[str]
 
     emotion_threshold: int
@@ -35,12 +36,18 @@ class Common_emotional_words_generator(Additional_data_generator):
         # Compute word counts
         self._get_word_counts()
 
+        self.all_words = [word for sublist in self.word_list.values() for word in sublist[0]]
+
     def get_sample(self, metadata: dict) -> str:
         """Get the batch of samples from the list
 
         :return: The next batch of samples (first element is the data and second is the label).
         """
         words, counts = self.word_list[metadata["label"]]
+
+        if(len(words) == 0):
+            print(f"Couldnt find and words for lable {metadata['label']}")
+            return "\n".join(random.choices(self.all_words, k=self.batch_size))
 
         # Select words randomly
         sampled_words = random.choices(words, weights=counts, k=self.batch_size)
@@ -87,6 +94,9 @@ class Common_emotional_words_generator(Additional_data_generator):
 
         self.word_list = {}
         for label, word_list in most_common_words.items():
-            words, counts = zip(*word_list)
-
+            if(len(word_list) != 0):
+                words, counts = zip(*word_list)
+            else:
+                words = []
+                counts = []
             self.word_list[label] = (words, counts)

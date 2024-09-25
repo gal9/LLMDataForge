@@ -29,6 +29,8 @@ class Similar_embeddings_filter(Filter):
     distance_metric: str
     distance_metric: Distance
     distance_threshold: float
+    distance_threshold_scale: float
+    collect_sample: bool
 
     vector_dataset: str
 
@@ -38,6 +40,8 @@ class Similar_embeddings_filter(Filter):
 
         :param config: The config dictionary
         """
+
+        super().configure(config)
 
         # Configure embedding algorithm
         self.embedding_algorithm = config["embedding_algorithm"]
@@ -53,18 +57,36 @@ class Similar_embeddings_filter(Filter):
 
         # Compute embeddings for teh reference dataset
         # TODO: handle no reference dataset
-        dataset_location = config.get("reference_dataset_location")
+        dataset_location = config.get("reference_dataset_location", "")
         self.vector_dataset = []
-        with open(dataset_location, "r") as f:
-            sample_list = json.load(f)
+        try:
+            with open(dataset_location, "r") as f:
+                sample_list = json.load(f)
 
-            for sample in sample_list:
-                self.vector_dataset.append(self.embedding_model.get_embedding(sample["data"]))
+                for sample in sample_list:
+                    self.vector_dataset.append(self.embedding_model.get_embedding(sample["data"]))
+            self.vector_dataset = np.array(self.vector_dataset)
+        except FileNotFoundError:
+            self.logger.info("No reference dataset found. Similarity filter will start with empty dataset")
+            self.vector_dataset = np.empty((0, 768))
 
-        # Find the pair in dataset that is most similar (skip checking same vectors)
+        self.distance_threshold_scale = config["distance_threshold_scale"]
+
+        if (len(self.vector_dataset) != 0):
+            # Find the pair in dataset that is most similar (skip checking same vectors)
+            self._update_distance_threshold()
+            self.collect_sample = False
+        else:
+            self.distance_threshold = 0
+            self.collect_sample = True
+        
+    def _update_distance_threshold_mean(self):
+        lowest_distance = np.mean([self.distance_metric.compute_distance(vector1, vector2) for i, vector1 in enumerate(self.vector_dataset) for vector2 in self.vector_dataset[i+1:]]) # noqa
+        self.distance_threshold = lowest_distance * self.distance_threshold_scale
+
+    def _update_distance_threshold(self):
         lowest_distance = min([self.distance_metric.compute_distance(vector1, vector2) for i, vector1 in enumerate(self.vector_dataset) for vector2 in self.vector_dataset[i+1:]]) # noqa
-
-        self.distance_threshold = lowest_distance * config["distance_threshold_scale"]
+        self.distance_threshold = lowest_distance * self.distance_threshold_scale
 
     def filter(self, samples: List[Dict], dataset_handler: Dataset_handler) -> List[Dict]:
         results = []
@@ -72,22 +94,40 @@ class Similar_embeddings_filter(Filter):
         for sample_dict in samples:
             sample = sample_dict["sample"]
 
-            sample_embedding = self.embedding_model.get_embedding(sample)
+            sample_embedding = self.embedding_model.get_embedding(sample).numpy()
 
-            if (not self.check_if_similar(sample_embedding)):
-                results.append(sample_dict)
+            if(self.collect_sample):
+                if(len(self.vector_dataset) == 100):
+                    self._update_distance_threshold()
+                    self.collect_sample = False
+                    self.logger.info("Finished calibrating the distance threshold.")
+                else:
+                    if (not self.check_if_similar(sample_embedding)):
+                        results.append(sample_dict)
+
+                        # Add the embedding to the vector dataset
+                        self.vector_dataset = np.vstack((self.vector_dataset, sample_embedding.reshape(1, -1)))
+
             else:
-                # Add sample to txt file
-                with open("failed_embedding.txt", "a") as f:
-                    f.write(sample + "\n")
+                if (not self.check_if_similar(sample_embedding)):
+                    results.append(sample_dict)
+
+                    # Add the embedding to the vector dataset
+                    self.vector_dataset = np.vstack((self.vector_dataset, sample_embedding.reshape(1, -1)))
+                else:
+                    pass
+                    # Add sample to txt file
+                    #with open("failed_embedding.txt", "a") as f:
+                    #    f.write(sample + "\n")
 
         return results
 
     def check_if_similar(self, sample_embedding: np.ndarray) -> bool:
-        for reference_embedding in self.vector_dataset:
-            if (self.distance_metric.compute_distance(sample_embedding, reference_embedding) < self.distance_threshold):
-                return True
-        return False
+        if(len(self.vector_dataset) == 0):
+            return False
+
+        distances = np.apply_along_axis(self.distance_metric.compute_distance, 1, self.vector_dataset, sample_embedding)
+        return np.any(distances <= self.distance_threshold)
 
     @staticmethod
     def get_name() -> str:

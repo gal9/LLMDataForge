@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import logging
 
 from .dataset_handlers import Dataset_handler, Dataset_handler_factory
 from .filters import Filter, Filter_factory
@@ -10,6 +11,13 @@ class Data_filter():
     save_interval: int
 
     def configure(self, config: Dict) -> None:
+        # Load logger configuration from a file
+        try:
+            logging.config.fileConfig("logger_config.ini")
+        except Exception:
+            logging.config.fileConfig("data-generator/logger_config.ini")
+        self.logger = logging.getLogger(__name__)
+
         component_configuration = config["data_filter_configuration"]
 
         self.dataset_handler = Dataset_handler_factory.create_and_configure(config)
@@ -28,7 +36,8 @@ class Data_filter():
         for filter in self.filters:
             try:
                 sample = filter.filter(sample, self.dataset_handler)
-            except Exception:
+            except Exception as e:
+                self.logger.error(e)
                 return
 
         self.dataset_handler.add_to_dataset(sample)

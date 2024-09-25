@@ -9,6 +9,8 @@ from .additional_data_generator import Additional_data_generator
 
 
 class Common_emotional_words_generator2(Additional_data_generator):
+    """I think this one does not separate on emotions.
+    """
     word_list: dict[str, tuple[list, list]]
     file_paths: list[str]
     sia: SentimentIntensityAnalyzer

@@ -35,6 +35,9 @@ class Random_reference_example_generator(Additional_data_generator):
         # Select batch_size number of random samples from self.sample_list
         samples = random.sample(self.sample_list, self.batch_size)
 
+        # Add at least one element with the label
+        samples[0] = random.sample([x for x in self.sample_list if x["label"] == metadata["label"]], 1)[0]
+
         # Return the data and label
         return "\n".join(["{0}: {1}".format(sample["data"], sample["label"]) for sample in samples])
 

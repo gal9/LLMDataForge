@@ -12,6 +12,7 @@ from .filter_llm_solve import LLM_solve_filter
 from .filter_substrings import Substring_filter
 from .filter_similar_embeddings import Similar_embeddings_filter
 from .filter_downstream_task import Downstream_task_filter
+from .filter_distinguish import Distinguish_filter
 
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "LLM_solve_filter",
     "Substring_filter",
     "Similar_embeddings_filter",
-    "Downstream_task_filter"
+    "Downstream_task_filter",
+    "Distinguish_filter",
 ]

@@ -17,7 +17,7 @@ nltk.download("stopwords")
 
 class Evaluator(ABC):
     @abstractmethod
-    def evaluate(self, test_set_location: str, dataset_handler: Dataset_handler) -> float:
+    def evaluate(self, test_set_location: str, dataset_handler: Dataset_handler, text_column: str = "text", label_column: str = "label") -> float:
         pass
 
 
@@ -34,7 +34,7 @@ class Classification_evaluator(Evaluator):
         # Combining the vectorizer and classifier into a single pipeline
         return make_pipeline(vectorizer, clf)
 
-    def evaluate(self, test_set_location: str, dataset_handler: Dataset_handler) -> float:
+    def evaluate(self, test_set_location: str, dataset_handler: Dataset_handler, text_column: str = "text", label_column: str = "label") -> float:
         np.random.seed(1)
         random.seed(1)
 
@@ -44,11 +44,11 @@ class Classification_evaluator(Evaluator):
         generated_df = dataset_handler.dataset
 
         # Splitting the dataset into features and target variable
-        X_test = test_set["Comment"]
-        y_test = test_set["Emotion"]
+        X_test = test_set[text_column]
+        y_test = test_set[label_column]
 
-        X_train = generated_df["Comment"]
-        y_train = generated_df["Emotion"]
+        X_train = generated_df[text_column]
+        y_train = generated_df[label_column]
 
         model = Classification_evaluator.make_NB_model()
 
@@ -56,6 +56,10 @@ class Classification_evaluator(Evaluator):
         model.fit(X_train, y_train)
 
         predictions = model.predict(X_test)
+
+        # Cast all predictions and y_test to lowercase
+        predictions = np.char.lower(np.array(predictions).astype(str))
+        y_test = np.char.lower(np.array(y_test).astype(str))
 
         # Return accuracy 4 decimal places
         return accuracy_score(y_test, predictions)
@@ -68,6 +72,8 @@ class Downstream_task_filter(Filter):
     score_threshold: float
     evaluator: Evaluator
     reference_data_location: str
+    text_column: str
+    label_column: str
 
     last_evaluated_at: int
     last_score: float
@@ -91,6 +97,9 @@ class Downstream_task_filter(Filter):
         else:
             raise ValueError(f"Unknown task {task_name}")
 
+        self.text_column = config.get("text_column", "text")
+        self.label_column = config.get("label_column", "label")
+
         self.last_evaluated_at = 0
         self.last_score = 0
 
@@ -100,7 +109,11 @@ class Downstream_task_filter(Filter):
         if (number_of_samples % self.batch_size == 0 and number_of_samples != self.last_evaluated_at):
             self.logger.info("Evaluating dataset")
             # Evaluate the dataset
-            current_score = self.evaluator.evaluate(self.reference_data_location, dataset_handler)
+            current_score = self.evaluator.evaluate(
+                self.reference_data_location,
+                dataset_handler,
+                text_column=self.text_column,
+                label_column=self.label_column)
 
             # If the score is worse, remove the last batch
             if (self.last_score - current_score > self.score_threshold):
@@ -110,9 +123,11 @@ class Downstream_task_filter(Filter):
                     f.write(f"Current score: {current_score}, last score: {self.last_score}\n")
                 # remove last batch of samples
                 dataset_handler.remove_last_n_samples(self.batch_size)
+                print("removing")
             else:
                 self.last_score = current_score
                 self.last_evaluated_at = number_of_samples
+                print("passed")
 
         return samples
 
